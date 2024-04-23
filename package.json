@@ -1,0 +1,32 @@
+{
+  "name": "monitor-processos",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^5.3.0",
+    "@tauri-apps/api": "^1",
+    "antd": "^5.14.2",
+    "dayjs": "^1.11.10",
+    "gapi-client": "^0.0.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-google-login": "^5.2.2",
+    "react-input-mask": "^2.0.4",
+    "tauri": "^0.15.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^1",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.17",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "vite": "^5.0.0"
+  }
+}
