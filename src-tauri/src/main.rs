@@ -70,11 +70,8 @@ fn insert_consultor(path: &str, consultor: &str, project_name: &str) -> String {
 #[tauri::command]
 fn create_folders_sctructure(path: &str) {
     //criar as pastas do projeto
-    let folders: [&str; 8] = [
+    let folders: [&str; 5] = [
         "01 - PROJETO",
-        "02 - DIGITACAO",
-        "03 - REVISAO",
-        "04 - CONFERENCIA",
         "05 - NEGOCIACAO",
         "06 - FINANCIAMENTO",
         "07 - FECHADO",
@@ -95,105 +92,95 @@ fn goto_folder(path: &str) {
 }
 
 #[tauri::command]
-fn read_all_projects(path: &str, fase: &str, customer: &str) -> Vec<String> {
-    let mut projects: Vec<String> = Vec::new();
-    if fase == "TODOS" || fase == "" {
-        let folders: [&str; 7] = [
-            "01 - PROJETO",
-            "02 - DIGITACAO",
-            "03 - REVISAO",
-            "04 - CONFERENCIA",
-            "05 - NEGOCIACAO",
-            "06 - FINANCIAMENTO",
-            "07 - FECHADO",
-        ];
-        for folder in folders {
-            let dir = fs::read_dir(format!("{}/{}", path, folder)).unwrap();
-            for entry in dir {
-                if entry.is_ok() {
-                    let entry = entry.unwrap();
-                    if entry.file_type().unwrap().is_dir() {
-                        //procure um arquivo chamado metadata.json dentro da pasta e mande seu conteudo para projects
-                        let metadata = fs::read_to_string(entry.path().join("metadata.json"));
-                        if metadata.is_ok() {
-                            projects.push(metadata.unwrap());
+fn read_all_projects(path: &str, fase: &str) -> Vec<String> {
+    let dir = fs::read_dir(format!("{}", path));
+
+    if dir.is_err() {
+        return Vec::new();
+    }
+
+    let dir = dir.unwrap();
+    let mut projects = Vec::new();
+    for entry in dir {
+        if let Ok(entry) = entry {
+            if entry.file_type().unwrap().is_dir() {
+                let sub_dir = fs::read_dir(entry.path());
+                if let Ok(sub_dir) = sub_dir {
+                    for sub_entry in sub_dir {
+                        if let Ok(sub_entry) = sub_entry {
+                            if sub_entry.file_type().unwrap().is_dir() {
+                                let metadata =
+                                    fs::read_to_string(sub_entry.path().join("metadata.json"));
+                                if let Ok(metadata) = metadata {
+                                    projects.push(metadata);
+                                }
+                            }
                         }
                     }
                 }
             }
         }
-    } else {
-        let dir = fs::read_dir(format!("{}/{}", path, fase)).unwrap();
-        for entry in dir {
-            if entry.is_ok() {
-                let entry = entry.unwrap();
-                if entry.file_type().unwrap().is_dir() {
-                    let metadata = fs::read_to_string(entry.path().join("metadata.json"));
-                    if metadata.is_ok() {
-                        projects.push(metadata.unwrap());
-                    }
-                }
-            }
-        }
-    }
-    if customer != "" {
-        projects = projects
-            .into_iter()
-            .filter(|x| x.contains(customer))
-            .collect();
     }
 
-    projects
+    if fase != "TODOS" && fase != "" {
+        projects = projects
+            .into_iter()
+            .filter_map(|metadata| {
+                // Parse the metadata string into a JSON value
+                let json: serde_json::Result<serde_json::Value> = serde_json::from_str(&metadata);
+                match json {
+                    Ok(json) => {
+                        // Check if the "fase" field of the JSON is equal to the "fase" parameter
+                        if json.get("fase").map_or(false, |f| f == fase) {
+                            Some(metadata)
+                        } else {
+                            None
+                        }
+                    }
+                    Err(_) => None, // If the metadata is not valid JSON, ignore it
+                }
+            })
+            .collect();
+
+        return projects;
+    }
+
+    return projects;
 }
 
 #[tauri::command]
 fn add_project(path: &str, fase: &str, project_name: &str, metadata: &str) -> String {
-    //verifique se existe uma pasta dentro de path com o nome project_name, se não houver, crie uma, caso haja, retorne um erro
-    //verifica em todas as subpastas de se existe uma pasta com o mesmo nome de project_name, se houver, retorne um erro
-    let directories = [
-        "01 - PROJETO",
-        "02 - DIGITACAO",
-        "03 - REVISAO",
-        "04 - CONFERENCIA",
-        "05 - NEGOCIACAO",
-        "06 - FINANCIAMENTO",
-        "07 - FECHADO",
-    ];
-    for directory in directories {
-        let dir_fases = fs::read_dir(format!("{}/{}", path, directory));
-        if dir_fases.is_ok() {
-            let dir_fases = dir_fases.unwrap();
-            for entry in dir_fases {
-                if entry.is_ok() {
-                    let entry = entry.unwrap();
-                    if entry.file_type().unwrap().is_dir() {
-                        if entry.file_name() == project_name {
-                            return "Já existe um projeto com esse mesmo nome".to_string();
-                        }
-                    }
-                }
-            }
-        }
+    let real_fase: &str;
+    if fase == "02 - DIGITACAO" || fase == "03 - REVISAO" || fase == "04 - CONFERENCIA" {
+        real_fase = "01 - PROJETO";
+    } else {
+        real_fase = fase;
     }
 
-    let dir = fs::read_dir(format!("{}/{}/{}", path, fase, project_name));
-    if dir.is_err() {
-        fs::create_dir(format!("{}/{}/{}", path, fase, project_name)).unwrap();
-        //verifique se metadata pode ser parseada para um json
-        let metadata = serde_json::from_str::<serde_json::Value>(metadata);
-        if metadata.is_err() {
-            "Erro ao adicionar projeto".to_string()
-        } else {
-            fs::write(
-                format!("{}/{}/{}/metadata.json", path, fase, project_name),
-                metadata.unwrap().to_string(),
-            )
-            .unwrap();
-            "Operação Executada Com Sucesso!".to_string()
-        }
-    } else {
-        "Já existe um projeto com esse mesmo nome".to_string()
+
+    let project_path = format!("{}/{}/{}", path, real_fase, project_name);
+
+    if fs::read_dir(&project_path).is_ok() {
+        return "Já existe um projeto com esse mesmo nome".to_string();
     }
+
+
+    let metadata_json = serde_json::from_str::<serde_json::Value>(metadata);
+
+    if metadata_json.is_err() {
+        return "Erro ao adicionar projeto".to_string();
+    }
+
+    let metadata_json = metadata_json.unwrap();
+    let metadata_path = format!("{}/metadata.json", &project_path);
+    fs::create_dir_all(&project_path).unwrap();
+    fs::write(metadata_path, metadata_json.to_string()).unwrap();
+    "Operação Executada Com Sucesso!".to_string()
+
+    
+
+
+    
 }
 #[tauri::command]
 fn read_all_custommers(path: &str) -> Vec<String> {
@@ -230,12 +217,30 @@ fn move_path<'a>(
     //mova a pasta path par ao caminho basepath/dest, com todos os seus arquivos e pasta
     //procure uma pasta chamada path no caminho basepath/orign e de um erro caso não ache
     //mova a pasta path par ao caminho basepath/dest, com todos os seus arquivos e pasta
+    let real_origin: &str;
+    let real_dest: &str;
 
-    let origin_path = format!("{}/{}/{}", basepath, origin, path);
-    let dest_path = format!("{}/{}/{}", basepath, dest, path);
+    
+    if origin =="02 - DIGITACAO" || origin == "03 - REVISAO" || origin == "04 - CONFERENCIA" {
+        real_origin = "01 - PROJETO";
+    } else {
+        real_origin = origin;
+        
+    }
 
-    let orign_metadata_path = format!("{}/{}/{}/{}", basepath, origin, path, "metadata.json");
-    let dest_metadata_path = format!("{}/{}/{}/{}", basepath, dest, path, "/metadata.json");
+    if dest =="02 - DIGITACAO" || dest == "03 - REVISAO" || dest == "04 - CONFERENCIA" {
+        real_dest = "01 - PROJETO";
+    } else {
+        real_dest = dest;
+    }
+
+
+
+    let origin_path = format!("{}/{}/{}", basepath, real_origin, path);
+    let dest_path = format!("{}/{}/{}", basepath, real_dest, path);
+
+    let orign_metadata_path = format!("{}/{}/{}/{}", basepath, real_origin, path, "metadata.json");
+    let dest_metadata_path = format!("{}/{}/{}/{}", basepath, real_dest, path, "/metadata.json");
 
     let metadata = fs::read_to_string(&orign_metadata_path);
     if metadata.is_err() {
@@ -319,64 +324,85 @@ fn clean_string(s: String) -> String {
         .replace("\"", "")
 }
 #[tauri::command]
-fn edit_project(
-    path: String,
-    fase: String,
-    cliente: String,
-    descricao: String,
-    campo: String,
+fn edit_project<'a>(
+    path: &'a str,
+    fase: &'a str,
+    cliente: &'a str,
+    descricao: &'a str,
+    campo: &'a str,
     valor: serde_json::Value,
 ) -> String {
+    let real_fase: &str;
+
+    if fase == "02 - DIGITACAO" || fase == "03 - REVISAO" || fase == "04 - CONFERENCIA" {
+        real_fase = "01 - PROJETO";
+    } else {
+        real_fase = fase;    }
+
     let cliente = cliente.replace(" ", "_");
     let descricao = descricao.replace(" ", "_");
     let cliente_descricao = format!("{}-{}", cliente, descricao);
-    let path = format!("{}/{}/{}", path, fase, cliente_descricao);
-    let metadata = fs::read_to_string(format!("{}/metadata.json", path));
+    let path = format!("{}/{}/{}", path, real_fase, cliente_descricao);
+    let metadata = fs::read_to_string(format!("{}/metadata.json", &path));
     if metadata.is_err() {
         return "Erro ao encontrar metadata".to_string();
     }
     let metadata = metadata.unwrap();
-    let metadata_json = serde_json::from_str::<serde_json::Value>(metadata.as_str());
+    let metadata_json = serde_json::from_str::<serde_json::Value>(&metadata);
     if metadata_json.is_err() {
         return "Erro ao parsear metadata".to_string();
     }
     let mut metadata_json = metadata_json.unwrap();
     metadata_json[campo] = valor;
-    fs::write(format!("{}/metadata.json", path), metadata_json.to_string()).unwrap();
+    fs::write(format!("{}/metadata.json", &path), metadata_json.to_string()).unwrap();
     "Operação Executada Com Sucesso!".to_string()
 }
 #[tauri::command]
-fn get_number_of_projects(path: String) -> Vec<i32> {
-    let mut projects: Vec<i32> = Vec::new();
-    let folders: [&str; 7] = [
-        "01 - PROJETO",
-        "02 - DIGITACAO",
-        "03 - REVISAO",
-        "04 - CONFERENCIA",
-        "05 - NEGOCIACAO",
-        "06 - FINANCIAMENTO",
-        "07 - FECHADO",
-    ];
-    for folder in folders {
-        let dir = fs::read_dir(format!("{}/{}", path, folder));
-        if dir.is_ok() {
-            let dir = dir.unwrap();
-            let mut count = 0;
-            for entry in dir {
-                if entry.is_ok() {
-                    let entry = entry.unwrap();
-                    if entry.file_type().unwrap().is_dir() {
-                        count += 1;
+fn get_number_of_projects(path: String) -> [i32; 8] {
+    let mut projects:[i32; 8] = [0,0,0,0,0,0,0,0];
+    
+    let dir = fs::read_dir(path);
+    if dir.is_err() {
+        return projects;
+    }
+
+    let dir = dir.unwrap();
+    for entry in dir {
+        if let Ok(entry) = entry {
+            if entry.path().is_dir() {
+                let sub_dir = fs::read_dir(entry.path());
+                if let Ok(sub_dir) = sub_dir {
+                    for sub_entry in sub_dir {
+                        if let Ok(sub_entry) = sub_entry {
+                            if sub_entry.path().is_dir() {
+                                let metadata_path = sub_entry.path().join("metadata.json");
+                                if metadata_path.exists() {
+                                    let metadata = fs::read_to_string(metadata_path);
+                                    if let Ok(metadata) = metadata {
+                                        let parsed_metadata: serde_json::Value = serde_json::from_str(&metadata).unwrap();
+                                        if parsed_metadata.is_object() {
+                                            projects[0] += 1;
+                                        }
+                                        match parsed_metadata["fase"].as_str() {
+                                            Some("01 - PROJETO") => projects[1] += 1,
+                                            Some("02 - DIGITACAO") => projects[2] += 1,
+                                            Some("03 - REVISAO") => projects[3] += 1,
+                                            Some("04 - CONFERENCIA") => projects[4] += 1,
+                                            Some("05 - NEGOCIACAO") => projects[5] += 1,
+                                            Some("06 - FINANCIAMENTO") => projects[6] += 1,
+                                            Some("07 - FECHADO") => projects[7] += 1,
+                                            _ => (),
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
-
-           
-            projects.push(count);
         }
     }
-    let total: i32 = projects.iter().sum();
-    projects.insert(0, total);
+    
     projects
 }
 
