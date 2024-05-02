@@ -27,26 +27,33 @@ function App() {
   const [configForm, setConfigForm] = useState(false)
   const [loginVisible, setLoginVisible] = useState(false)
 
+  
 
   const DeadLine = (record) => {
-    console.log(config)
+
+    let deadLineConfig = {}
+    try{
+       deadLineConfig = JSON.parse(config.DEAD_LINE)
+    }
+    catch(error){
+       deadLineConfig = config.DEAD_LINE
+    }
+   
     const fases = {
-      "01 - PROJETO": config.DEAD_LINE.projeto,
-      "02 - DIGITACAO": config.DEAD_LINE.digitacao,
-      "03 - REVISAO": config.DEAD_LINE.revisao,
-      "04 - CONFERENCIA": config.DEAD_LINE.conferencia,
-      "05 - NEGOCIACAO": config.DEAD_LINE.negociacao,
-      "06 - FINANCIAMENTO": config.DEAD_LINE.financiamento,
+      "01 - PROJETO": deadLineConfig.projeto,
+      "02 - DIGITACAO": deadLineConfig.digitacao,
+      "03 - REVISAO": deadLineConfig.revisao,
+      "04 - CONFERENCIA": deadLineConfig.conferencia,
+      "05 - NEGOCIACAO": deadLineConfig.negociacao,
+      "06 - FINANCIAMENTO": deadLineConfig.financiamento,
       "07 - FECHADO": "Fechado"
 
     };
 
-  
+
     const arrDataModificacao = record.dataModificacao.split("/")
     const dataModificacao = new Date(arrDataModificacao[2], arrDataModificacao[1] - 1, arrDataModificacao[0])
     const prazo = fases[record.fase]
-
-    console.log(prazo)
     const deadlineDate = new Date(dataModificacao.getTime() + (prazo*86400000));
     const today = new Date()
 
@@ -218,11 +225,13 @@ function App() {
     })
   }, [selectedFolder, customer])
 
-  const readAllProjects = async (conf = config) => {
+  const readAllProjects = async (conf) => {
     invoke("read_all_projects", { path: conf.BASE_FOLDER, fase: selectedFolder, customer: customer }).then((data) => {
 
       const jsonData = data.map(p => JSON.parse(p))
+      console.log(customer)
       setFilteredValues(() =>
+        
         jsonData.map((project, index) => ({
           key: index,
           responsavel: project.responsavel,
@@ -240,7 +249,7 @@ function App() {
 
         }))
       )
-
+    
 
 
 

@@ -118,18 +118,19 @@ export default function SeachScreen({ columns, filtredValues, setShowForm, onFil
         <Divider />
         <LoginModal visible={loginvisible} onLoginSubmit={loginSubmit} onCancel={handleCancelLoginForm}/>
         <div>
-          <Table columns={columns} dataSource={filtredValues} />
+          <Table pagination={{pageSize:6}} columns={columns} dataSource={filtredValues} />
 
         </div>
         <FloatButton
           icon={<PlusOutlined />}
           type="primary"
+          style={{ right: "140px" }}
           aria-label="Adcionar Processo"
           tooltip="Adcionar Processo"
           onClick={() => setShowForm(false)} />
         <FloatButton
           icon={<SettingOutlined />}
-          style={{ right: "82px" }}
+          style={{ right: "200px" }}
           aria-label="Configurações"
           tooltip="Configurações"
           onClick={() => setLoginVisible(true)} />

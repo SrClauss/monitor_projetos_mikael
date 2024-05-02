@@ -2,7 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use serde_json::json;
-use std::fs;
+use std::fs::{self, Metadata};
 use std::process::Command;
 use uuid::Uuid;
 
@@ -92,7 +92,7 @@ fn goto_folder(path: &str) {
 }
 
 #[tauri::command]
-fn read_all_projects(path: &str, fase: &str) -> Vec<String> {
+fn read_all_projects(path: &str, fase: &str, customer: &str) -> Vec<String> {
     let dir = fs::read_dir(format!("{}", path));
 
     if dir.is_err() {
@@ -125,23 +125,27 @@ fn read_all_projects(path: &str, fase: &str) -> Vec<String> {
     if fase != "TODOS" && fase != "" {
         projects = projects
             .into_iter()
-            .filter_map(|metadata| {
-                // Parse the metadata string into a JSON value
-                let json: serde_json::Result<serde_json::Value> = serde_json::from_str(&metadata);
-                match json {
-                    Ok(json) => {
-                        // Check if the "fase" field of the JSON is equal to the "fase" parameter
-                        if json.get("fase").map_or(false, |f| f == fase) {
-                            Some(metadata)
-                        } else {
-                            None
-                        }
-                    }
-                    Err(_) => None, // If the metadata is not valid JSON, ignore it
+            .filter(|metadata| {
+                let metadata_json = serde_json::from_str::<serde_json::Value>(metadata);
+                if metadata_json.is_err() {
+                    return false;
                 }
-            })
-            .collect();
-
+                let metadata_json = metadata_json.unwrap();
+                let project_fase = metadata_json["fase"].to_string();
+                return project_fase.contains(fase);
+            }).collect();
+    }
+    if customer.len() > 2 {
+        projects = projects.into_iter().filter(|metaadata| {
+            let metadata_json = serde_json::from_str::<serde_json::Value>(metaadata);
+            if metadata_json.is_err() {
+                return false;
+            }
+            let metadata_json = metadata_json.unwrap();
+            let customer_name = metadata_json["cliente"]["nome"].to_string();
+            return customer_name.contains(customer);
+        
+        }).collect();
         return projects;
     }
 
