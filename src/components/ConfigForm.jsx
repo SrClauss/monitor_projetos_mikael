@@ -30,6 +30,7 @@ export default function ConfigForm({ setShowConfig, config, onSubmit }) {
                             revisao: datajson.revisao,
                             conferencia: datajson.conferencia,
                             negociacao: datajson.negociacao,
+                            financiamento: datajson.financiamento
 
                         }})).then(() => {
                         console.log("Configuração salva com sucesso")

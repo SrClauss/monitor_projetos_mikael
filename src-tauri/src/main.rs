@@ -375,9 +375,7 @@ fn get_number_of_projects(path: String) -> [i32; 8] {
                                     if let Ok(metadata) = metadata {
                                         let parsed_metadata: serde_json::Value =
                                             serde_json::from_str(&metadata).unwrap();
-                                        if parsed_metadata.is_object() {
-                                            projects[0] += 1;
-                                        }
+                                        
                                         match parsed_metadata["fase"].as_str() {
                                             Some("01 - PROJETO") => projects[1] += 1,
                                             Some("02 - DIGITACAO") => projects[2] += 1,
@@ -398,6 +396,8 @@ fn get_number_of_projects(path: String) -> [i32; 8] {
         }
     }
 
+   
+    projects[0] = projects[1] + projects[2] + projects[3] + projects[4] + projects[5] + projects[6];
     projects
 }
 

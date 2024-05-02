@@ -29,6 +29,7 @@ function App() {
 
 
   const DeadLine = (record) => {
+    console.log(config)
     const fases = {
       "01 - PROJETO": config.DEAD_LINE.projeto,
       "02 - DIGITACAO": config.DEAD_LINE.digitacao,
@@ -44,14 +45,18 @@ function App() {
     const arrDataModificacao = record.dataModificacao.split("/")
     const dataModificacao = new Date(arrDataModificacao[2], arrDataModificacao[1] - 1, arrDataModificacao[0])
     const prazo = fases[record.fase]
-    const deadlineDate = new Date(dataModificacao.getTime() + (prazo * 24 * 60 * 60 * 1000));
+
+    console.log(prazo)
+    const deadlineDate = new Date(dataModificacao.getTime() + (prazo*86400000));
     const today = new Date()
 
     return (
       <div className={(today > deadlineDate) ? "text-red-500" : "text-green-500"}>
         <div className="text-center">{record.dataModificacao}</div>
         {(record.fase !== "07 - FECHADO") ?
-          (<div className="mt-3 text-center">{(today > deadlineDate) ? `(Atrasado desde ${deadlineDate.toLocaleDateString("PT-BR")})` : `Expira em ${deadlineDate.toLocaleDateString("PT-BR")}`}</div>) :
+          (<div className="mt-3 text-center">{(today > deadlineDate) ? 
+          `(Atrasado desde ${deadlineDate.toLocaleDateString("PT-BR")})` : 
+          `Expira em ${deadlineDate.toLocaleDateString("PT-BR")}`}</div>) :
           (<div className="mt-3 text-center">Projeto Fechado</div>)
         }
       </div>
@@ -387,7 +392,7 @@ function App() {
 
   ]
   const handleLoginSubmit = (formValues) => {
-    if (formValues.senha === "1234") {
+    if (formValues.senha === "031265") {
       setLoginVisible(false)
       setConfigForm(true)
     } else {
