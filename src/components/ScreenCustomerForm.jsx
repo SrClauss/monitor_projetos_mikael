@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api";
 import InputMask from "react-input-mask"
 import { ArrowLeftOutlined, BackwardFilled } from "@ant-design/icons";
+const BRUFS = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"];
 export default function ScreenCustomerForm({ setCustomerForm, config, value = null, onSubmit }) {
     const [nome, setNome] = useState();
     const [cadastroPessoa, setCadastroPessoa] = useState('');
@@ -144,7 +145,7 @@ export default function ScreenCustomerForm({ setCustomerForm, config, value = nu
                             showSearch
                             placeholder="Estado"
                             value={endereco.uf}
-                            options={config.BRUFS.map((uf) => ({ label: uf, value: uf }))}
+                            options={BRUFS.map((uf) => ({ label: uf, value: uf }))}
                             onChange={(e) => setEndereco({ ...endereco, uf: e.target.value.toUpperCase() })}
                             style={{ width: "20%" }}
                         />

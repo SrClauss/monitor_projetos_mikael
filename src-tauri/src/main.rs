@@ -157,13 +157,11 @@ fn add_project(path: &str, fase: &str, project_name: &str, metadata: &str) -> St
         real_fase = fase;
     }
 
-
     let project_path = format!("{}/{}/{}", path, real_fase, project_name);
 
     if fs::read_dir(&project_path).is_ok() {
         return "Já existe um projeto com esse mesmo nome".to_string();
     }
-
 
     let metadata_json = serde_json::from_str::<serde_json::Value>(metadata);
 
@@ -176,11 +174,6 @@ fn add_project(path: &str, fase: &str, project_name: &str, metadata: &str) -> St
     fs::create_dir_all(&project_path).unwrap();
     fs::write(metadata_path, metadata_json.to_string()).unwrap();
     "Operação Executada Com Sucesso!".to_string()
-
-    
-
-
-    
 }
 #[tauri::command]
 fn read_all_custommers(path: &str) -> Vec<String> {
@@ -220,21 +213,17 @@ fn move_path<'a>(
     let real_origin: &str;
     let real_dest: &str;
 
-    
-    if origin =="02 - DIGITACAO" || origin == "03 - REVISAO" || origin == "04 - CONFERENCIA" {
+    if origin == "02 - DIGITACAO" || origin == "03 - REVISAO" || origin == "04 - CONFERENCIA" {
         real_origin = "01 - PROJETO";
     } else {
         real_origin = origin;
-        
     }
 
-    if dest =="02 - DIGITACAO" || dest == "03 - REVISAO" || dest == "04 - CONFERENCIA" {
+    if dest == "02 - DIGITACAO" || dest == "03 - REVISAO" || dest == "04 - CONFERENCIA" {
         real_dest = "01 - PROJETO";
     } else {
         real_dest = dest;
     }
-
-
 
     let origin_path = format!("{}/{}/{}", basepath, real_origin, path);
     let dest_path = format!("{}/{}/{}", basepath, real_dest, path);
@@ -337,7 +326,8 @@ fn edit_project<'a>(
     if fase == "02 - DIGITACAO" || fase == "03 - REVISAO" || fase == "04 - CONFERENCIA" {
         real_fase = "01 - PROJETO";
     } else {
-        real_fase = fase;    }
+        real_fase = fase;
+    }
 
     let cliente = cliente.replace(" ", "_");
     let descricao = descricao.replace(" ", "_");
@@ -354,13 +344,17 @@ fn edit_project<'a>(
     }
     let mut metadata_json = metadata_json.unwrap();
     metadata_json[campo] = valor;
-    fs::write(format!("{}/metadata.json", &path), metadata_json.to_string()).unwrap();
+    fs::write(
+        format!("{}/metadata.json", &path),
+        metadata_json.to_string(),
+    )
+    .unwrap();
     "Operação Executada Com Sucesso!".to_string()
 }
 #[tauri::command]
 fn get_number_of_projects(path: String) -> [i32; 8] {
-    let mut projects:[i32; 8] = [0,0,0,0,0,0,0,0];
-    
+    let mut projects: [i32; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
+
     let dir = fs::read_dir(path);
     if dir.is_err() {
         return projects;
@@ -379,7 +373,8 @@ fn get_number_of_projects(path: String) -> [i32; 8] {
                                 if metadata_path.exists() {
                                     let metadata = fs::read_to_string(metadata_path);
                                     if let Ok(metadata) = metadata {
-                                        let parsed_metadata: serde_json::Value = serde_json::from_str(&metadata).unwrap();
+                                        let parsed_metadata: serde_json::Value =
+                                            serde_json::from_str(&metadata).unwrap();
                                         if parsed_metadata.is_object() {
                                             projects[0] += 1;
                                         }
@@ -402,12 +397,66 @@ fn get_number_of_projects(path: String) -> [i32; 8] {
             }
         }
     }
-    
+
     projects
+}
+
+#[tauri::command]
+fn get_dead_line(path: &str) -> String {
+    let dir = fs::read_dir(path);
+    if dir.is_err() {
+        return "401".to_string();
+    }
+
+    let dead_line = fs::read_to_string(format!("{}/dead_line.json", path));
+    if dead_line.is_err() {
+        return "401".to_string();
+    }
+
+    let dead_line = dead_line.unwrap();
+    let dead_line_json = serde_json::from_str::<serde_json::Value>(&dead_line);
+    if dead_line_json.is_err() {
+        return "401".to_string();
+    }
+
+    return dead_line_json.unwrap().to_string();
+}
+#[tauri::command]
+fn set_dead_line(path: &str, dead_line: &str) -> String {
+    let dir = fs::read_dir(path);
+    if dir.is_err() {
+        return "Erro ao encontrar diretorio".to_string();
+    }
+
+    let dead_line_json = serde_json::from_str::<serde_json::Value>(dead_line);
+    if dead_line_json.is_err() {
+        return "Erro ao parsear dead_line".to_string();
+    }
+    //tente achar dead_line.json
+    let dead_line = fs::read_to_string(format!("{}/dead_line.json", path));
+
+    if dead_line.is_err() {
+        //se não achar, crie um novo arquivo
+        fs::write(
+            format!("{}/dead_line.json", path),
+            dead_line_json.unwrap().to_string(),
+        )
+        .unwrap();
+    } else {
+        //se achar, sobrescreva o arquivo
+        fs::write(
+            format!("{}/dead_line.json", path),
+            dead_line_json.unwrap().to_string(),
+        )
+        .unwrap();
+    }
+
+    "Operação Executada Com Sucesso!".to_string()
 }
 
 fn main() {
     tauri::Builder::default()
+        .setup(setup_handler)
         .invoke_handler(tauri::generate_handler![
             goto_folder,
             create_folders_sctructure,
@@ -418,8 +467,50 @@ fn main() {
             add_customer,
             insert_consultor,
             edit_project,
-            get_number_of_projects
+            get_number_of_projects,
+            get_dead_line,
+            set_dead_line
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+fn setup_handler(app: &mut tauri::App) -> Result<(), Box<(dyn std::error::Error + 'static)>> {
+    let app_handle = app.handle();
+    let config_path = app_handle
+        .path_resolver()
+        .app_local_data_dir()
+        .unwrap_or(std::path::PathBuf::new());
+    let config_path_file = config_path.join("config.json");
+    let config = fs::read_to_string(&config_path_file);
+    if config.is_err() {
+        println!("config.json not found, creating a new one");
+        return Ok(());
+    }
+    let config = config.unwrap();
+    let config_json = serde_json::from_str::<serde_json::Value>(&config);
+    if config_json.is_err() {
+        println!("config.json is invalid, creating a new one");
+        return Ok(());
+    }
+
+    let config_json = config_json.unwrap();
+    let stored_dead_line = get_dead_line(config_json["BASE_FOLDER"].as_str().unwrap());
+    if stored_dead_line == "401" {
+        println!("invalid dead_line.json");
+        return Ok(());
+    }
+    let new_config = json!({
+        "BASE_FOLDER": config_json["BASE_FOLDER"],
+        "DEAD_LINE": stored_dead_line
+    });
+    if fs::write(config_path_file, new_config.to_string()).is_err() {
+        println!("error while writing config.json");
+        return Ok(());
+    }
+    else{
+        println!("config.json updated");
+    }
+
+
+    Ok(())
 }

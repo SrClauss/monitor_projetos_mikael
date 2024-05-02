@@ -1,22 +1,23 @@
 import { useState, useEffect } from "react";
 import "./App.css";
-import { Button, Tooltip, Checkbox } from "antd";
+import { Button, Tooltip, Modal, Form, Input } from "antd";
 import { DoubleLeftOutlined, DoubleRightOutlined, FolderOpenFilled, CheckOutlined, DeleteColumnOutlined, DeleteOutlined } from "@ant-design/icons";
 import { appLocalDataDir } from "@tauri-apps/api/path";
-import { dialog, fs, window as tauriWindow } from "@tauri-apps/api";
+import { fs } from "@tauri-apps/api";
 import SeachScreen from "./components/SeachScreen";
 import ScreenNovoProcesso from "./components/ScreenNovoProcesso";
 import { invoke } from "@tauri-apps/api";
 import ConfigForm from "./components/ConfigForm";
 import Consultor from "./components/Consultor";
+import LoginModal from "./components/LoginModal";
+
+
 
 
 function App() {
-  function open_dialog(){
-    const webview = new tauriWindow.WebviewWindow('theUniqueLabel', {
-      url: 'https://github.com/tauri-apps/tauri'})
-    
-  }
+
+
+
 
   const [filteredValues, setFilteredValues] = useState([]);
   const [showForm, setShowForm] = useState(true);
@@ -24,6 +25,7 @@ function App() {
   const [selectedFolder, setSelectedFolder] = useState("TODOS")
   const [customer, setCustomer] = useState("")
   const [configForm, setConfigForm] = useState(false)
+  const [loginVisible, setLoginVisible] = useState(false)
 
 
   const DeadLine = (record) => {
@@ -37,6 +39,8 @@ function App() {
       "07 - FECHADO": "Fechado"
 
     };
+
+  
     const arrDataModificacao = record.dataModificacao.split("/")
     const dataModificacao = new Date(arrDataModificacao[2], arrDataModificacao[1] - 1, arrDataModificacao[0])
     const prazo = fases[record.fase]
@@ -53,42 +57,27 @@ function App() {
       </div>
     )
 
+   
 
   }
+
   const navigateTo = (record) => {
-    const folder = (config.BASE_FOLDER + "/" + record.fase + "/" + (record.cliente + "-" + record.descricao).replaceAll(" ", "_").toUpperCase()).replaceAll("/", "\\");
+    let fase = ""
+    if (record.fase === "02 - DIGITACAO" || record.fase === "03 - REVISAO" || record.fase === "04 - CONFERENCIA") {
+      fase = "01 - PROJETO"
+    }
+    else{
+
+      fase = record.fase
+    }
+    const folder = (config.BASE_FOLDER + "/" + fase + "/" + (record.cliente + "-" + record.descricao).replaceAll(" ", "_").toUpperCase()).replaceAll("/", "\\");
 
     invoke("goto_folder", { path: folder })
   }
 
 
-  const handleConfigSubmit = (conf) => {
+  const handleConfigSubmit = () => {
 
-    const configuration = {
-      BASE_FOLDER: conf.BASE_FOLDER,
-      DEAD_LINE: {
-        projeto: conf.DEADLINE_PROJETO,
-        digitacao: conf.DEADLINE_DIGITACAO,
-        revisao: conf.DEADLINE_REVISAO,
-        conferencia: conf.DEADLINE_CONFERENCIA,
-        negociacao: conf.DEADLINE_NEGOCIACAO,
-        financiamento: conf.DEADLINE_FINANCIAMENTO
-
-      },
-      BRUFS: ["AC", "AL", "AM", "AP", "BA", "CE", "DF", "ES", "GO", "MA", "MG", "MS", "MT", "PA", "PB", "PE", "PI", "PR", "RJ", "RN", "RO", "RR", "RS", "SC", "SE", "SP", "TO"]
-    }
-    invoke("create_folders_sctructure", { path: configuration.BASE_FOLDER }).then((data) => {
-      console.log(data)
-    }).catch((error) => {
-      console.log(error)
-    })
-
-    appLocalDataDir().then((path) =>
-      fs.writeTextFile(path + "config.json", JSON.stringify(configuration))
-    )
-    setConfig(configuration)
-
-    readAllProjects()
     setConfigForm(false)
 
 
@@ -177,7 +166,6 @@ function App() {
 
   }
 
-
   useEffect(() => {
 
 
@@ -185,16 +173,13 @@ function App() {
       appLocalDataDir().then((path) => {
         fs.exists(path + "config.json").then(async (exists) => {
           if (!exists) {
-            setConfigForm(true)
-            await dialog.message("Não existe arquivo de cofiguração para esta aplicação, configure o diretorio base e os responsáveis. Esta configuração poderá ser mudada posteriormente")
-
-
+            setLoginVisible(true)
           }
           else {
             appLocalDataDir().then((path) => {
               fs.readTextFile(path + "config.json").then((data) => {
                 if (!JSON.parse(data).BASE_FOLDER) {
-                  setConfigForm(true)
+                  setLoginVisible(true)
                 }
                 else {
                   setConfig(JSON.parse(data))
@@ -208,6 +193,7 @@ function App() {
 
 
       })
+      
 
       fs.readTextFile(path + "/config.json").then((data) => {
         const parsedData = JSON.parse(data)
@@ -226,7 +212,6 @@ function App() {
 
     })
   }, [selectedFolder, customer])
-
 
   const readAllProjects = async (conf = config) => {
     invoke("read_all_projects", { path: conf.BASE_FOLDER, fase: selectedFolder, customer: customer }).then((data) => {
@@ -259,7 +244,7 @@ function App() {
     })
   }
 
-  
+
 
 
   const columns = [
@@ -285,7 +270,8 @@ function App() {
       title: "Data Criação",
       dataIndex: "dataCriacao",
       key: "dataCriacao",
-      width: "5%"
+      width: "5%",
+    
 
     },
     {
@@ -293,7 +279,9 @@ function App() {
       dataIndex: "dataModificacao",
       key: "dataModificacao",
       width: "5%",
-      render: (_, record) => DeadLine(record)
+      render: (_, record) => DeadLine(record) 
+
+
 
 
     },
@@ -398,36 +386,54 @@ function App() {
 
 
   ]
+  const handleLoginSubmit = (formValues) => {
+    if (formValues.senha === "1234") {
+      setLoginVisible(false)
+      setConfigForm(true)
+    } else {
+      alert("Senha incorreta")
+
+    }
+
+  }
+  const handleCancelLoginForm = () => {
+
+    setLoginVisible(false)
+  }
 
   return (
 
 
     <div className="p-4">
-      <button onClick={open_dialog}>Open</button>
 
-     
-      
 
-      {showForm ? (
-        configForm ? (
-          <ConfigForm setShowConfig={setConfigForm} config={config} onSubmit={handleConfigSubmit} />
+
+      {showForm ?
+        (
+          configForm ? (
+            <ConfigForm setShowConfig={setConfigForm} config={config} onSubmit={handleConfigSubmit} />
+          ) :
+            <>
+              <LoginModal visible={loginVisible} onLoginSubmit={handleLoginSubmit} onCancel={handleCancelLoginForm}/>
+              <SeachScreen
+                columns={columns}
+                filtredValues={filteredValues}
+                setShowForm={setShowForm}
+                onFilterSet={setSelectedFolder}
+                onSetCustomer={setCustomer}
+                setConfigForm={setConfigForm}
+                loginSubmit={handleLoginSubmit}
+
+
+
+              />
+            </>
         ) :
-
-          <SeachScreen
-            columns={columns}
-            filtredValues={filteredValues}
-            setShowForm={setShowForm}
-            onFilterSet={setSelectedFolder}
-            onSetCustomer={setCustomer}
-            setConfigForm={setConfigForm}
-
-
-
-          />) :
         (<ScreenNovoProcesso
           config={config}
           setShowForm={() => setShowForm(!showForm)}
-          readAllProjects={readAllProjects} />)}
+          readAllProjects={readAllProjects} />
+        )}
 
 
 
@@ -440,6 +446,8 @@ function App() {
 
   )
 }
+
+
 
 
 

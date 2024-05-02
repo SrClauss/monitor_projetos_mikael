@@ -4,9 +4,10 @@ import Search from "antd/es/input/Search";
 import { useEffect, useState} from "react";
 import { app, fs, invoke } from "@tauri-apps/api";
 import { appLocalDataDir } from "@tauri-apps/api/path";
+import LoginModal from "./LoginModal";
 
 
-export default function SeachScreen({ columns, filtredValues, setShowForm, onFilterSet, onSetCustomer, setConfigForm}) {
+export default function SeachScreen({ columns, filtredValues, setShowForm, onFilterSet, onSetCustomer, loginSubmit}) {
   const [numTodos, setNumTodos] = useState(0)
   const [numProjeto, setNumProjeto] = useState(0)
   const [numDigitacao, setNumDigitacao] = useState(0)
@@ -15,7 +16,7 @@ export default function SeachScreen({ columns, filtredValues, setShowForm, onFil
   const [numNegociacao, setNumNegociacao] = useState(0)
   const [numFinanciamento, setNumFinanciamento] = useState(0)
   const [numFechado, setNumFechado] = useState(0)
-  
+  const [loginvisible, setLoginVisible] = useState(false)
 
   useEffect(() => {
     appLocalDataDir().then((dir) => {
@@ -79,7 +80,12 @@ export default function SeachScreen({ columns, filtredValues, setShowForm, onFil
     }
   ]
 
+  const handleCancelLoginForm = () => {
 
+    setLoginVisible(false)
+  }
+
+  
 
   return (
     <div>
@@ -107,7 +113,10 @@ export default function SeachScreen({ columns, filtredValues, setShowForm, onFil
             buttonStyle="solid"
             defaultValue="TODOS" />
         </div>
+
+
         <Divider />
+        <LoginModal visible={loginvisible} onLoginSubmit={loginSubmit} onCancel={handleCancelLoginForm}/>
         <div>
           <Table columns={columns} dataSource={filtredValues} />
 
@@ -123,7 +132,7 @@ export default function SeachScreen({ columns, filtredValues, setShowForm, onFil
           style={{ right: "82px" }}
           aria-label="Configurações"
           tooltip="Configurações"
-          onClick={() => setConfigForm(true)} />
+          onClick={() => setLoginVisible(true)} />
         <FloatButton
           icon={<ReloadOutlined />}
           style={{ left: "40px" }}
