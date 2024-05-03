@@ -16,6 +16,7 @@ export default function SeachScreen({ columns, filtredValues, setShowForm, onFil
   const [numNegociacao, setNumNegociacao] = useState(0)
   const [numFinanciamento, setNumFinanciamento] = useState(0)
   const [numFechado, setNumFechado] = useState(0)
+  const [numArquivado, setNumArquivado] = useState(0)
   const [loginvisible, setLoginVisible] = useState(false)
 
   useEffect(() => {
@@ -33,6 +34,7 @@ export default function SeachScreen({ columns, filtredValues, setShowForm, onFil
             setNumNegociacao(data[5])
             setNumFinanciamento(data[6])
             setNumFechado(data[7])
+            setNumArquivado(data[8])
             
           })
 
@@ -77,6 +79,12 @@ export default function SeachScreen({ columns, filtredValues, setShowForm, onFil
     {
       label: `Fechado (${numFechado})`,
       value: "07 - FECHADO",
+    },
+    {
+      label: `Arquivado (${numArquivado})`,
+      value: "08 - ARQUIVADO",
+
+
     }
   ]
 

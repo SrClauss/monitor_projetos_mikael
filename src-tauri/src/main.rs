@@ -1,10 +1,13 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+
 use serde_json::json;
-use std::fs::{self, Metadata};
+use walkdir::WalkDir;
+use std::fs;
 use std::process::Command;
 use uuid::Uuid;
+
 
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
 
@@ -70,11 +73,12 @@ fn insert_consultor(path: &str, consultor: &str, project_name: &str) -> String {
 #[tauri::command]
 fn create_folders_sctructure(path: &str) {
     //criar as pastas do projeto
-    let folders: [&str; 5] = [
+    let folders: [&str; 6] = [
         "01 - PROJETO",
         "05 - NEGOCIACAO",
         "06 - FINANCIAMENTO",
         "07 - FECHADO",
+        "08 - ARQUIVADO",
         "CLIENTES",
     ];
     for folder in folders {
@@ -93,65 +97,49 @@ fn goto_folder(path: &str) {
 
 #[tauri::command]
 fn read_all_projects(path: &str, fase: &str, customer: &str) -> Vec<String> {
-    let dir = fs::read_dir(format!("{}", path));
+    //leia o diretorio de trabalho que iremos iterar
+    //crie um vetor de jsons para armazenar os metadados dos projetos
+    let mut projects_json: Vec<serde_json::Value> = Vec::new();
+    
 
-    if dir.is_err() {
-        return Vec::new();
-    }
-
-    let dir = dir.unwrap();
-    let mut projects = Vec::new();
-    for entry in dir {
-        if let Ok(entry) = entry {
-            if entry.file_type().unwrap().is_dir() {
-                let sub_dir = fs::read_dir(entry.path());
-                if let Ok(sub_dir) = sub_dir {
-                    for sub_entry in sub_dir {
-                        if let Ok(sub_entry) = sub_entry {
-                            if sub_entry.file_type().unwrap().is_dir() {
-                                let metadata =
-                                    fs::read_to_string(sub_entry.path().join("metadata.json"));
-                                if let Ok(metadata) = metadata {
-                                    projects.push(metadata);
-                                }
-                            }
-                        }
+    for entry in WalkDir::new(path){
+        if entry.is_ok(){
+            let entry = entry.unwrap();
+            if entry.file_type().is_dir() 
+                && entry.file_name()!="CLIENTES" 
+                && entry.file_name() != "08 - ARQUIVADO"{
+                let metadata_path = entry.path().join("metadata.json");
+                if metadata_path.exists(){
+                    let metadata = fs::read_to_string(metadata_path);
+                    if metadata.is_ok(){
+                        let metadata_json = serde_json::from_str::<serde_json::Value>(metadata.unwrap().as_str());
+                        if metadata_json.is_ok(){
+                            projects_json.push(metadata_json.unwrap());
+                        }           
                     }
                 }
             }
         }
     }
+    if fase != "TODOS"{
 
-    if fase != "TODOS" && fase != "" {
-        projects = projects
-            .into_iter()
-            .filter(|metadata| {
-                let metadata_json = serde_json::from_str::<serde_json::Value>(metadata);
-                if metadata_json.is_err() {
-                    return false;
-                }
-                let metadata_json = metadata_json.unwrap();
-                let project_fase = metadata_json["fase"].to_string();
-                return project_fase.contains(fase);
-            }).collect();
-    }
-    if customer.len() > 2 {
-        projects = projects.into_iter().filter(|metaadata| {
-            let metadata_json = serde_json::from_str::<serde_json::Value>(metaadata);
-            if metadata_json.is_err() {
-                return false;
-            }
-            let metadata_json = metadata_json.unwrap();
-            let customer_name = metadata_json["cliente"]["nome"].to_string();
-            return customer_name.contains(customer);
-        
+        projects_json = projects_json.into_iter().filter(|metadata|{
+            return  metadata["fase"] == json!(fase);
+
+            
         }).collect();
-        return projects;
     }
+    if customer.len() > 2{
 
-    return projects;
+        projects_json = projects_json.into_iter().filter(|metadata|{
+            return metadata["cliente"]["nome"].to_string().contains(customer);
+        }).collect();
+    }
+    
+    return projects_json.into_iter().map(|metadata| metadata.to_string()).collect();
+
+
 }
-
 #[tauri::command]
 fn add_project(path: &str, fase: &str, project_name: &str, metadata: &str) -> String {
     let real_fase: &str;
@@ -316,48 +304,10 @@ fn clean_string(s: String) -> String {
         .replace(")", "")
         .replace("\"", "")
 }
-#[tauri::command]
-fn edit_project<'a>(
-    path: &'a str,
-    fase: &'a str,
-    cliente: &'a str,
-    descricao: &'a str,
-    campo: &'a str,
-    valor: serde_json::Value,
-) -> String {
-    let real_fase: &str;
 
-    if fase == "02 - DIGITACAO" || fase == "03 - REVISAO" || fase == "04 - CONFERENCIA" {
-        real_fase = "01 - PROJETO";
-    } else {
-        real_fase = fase;
-    }
-
-    let cliente = cliente.replace(" ", "_");
-    let descricao = descricao.replace(" ", "_");
-    let cliente_descricao = format!("{}-{}", cliente, descricao);
-    let path = format!("{}/{}/{}", path, real_fase, cliente_descricao);
-    let metadata = fs::read_to_string(format!("{}/metadata.json", &path));
-    if metadata.is_err() {
-        return "Erro ao encontrar metadata".to_string();
-    }
-    let metadata = metadata.unwrap();
-    let metadata_json = serde_json::from_str::<serde_json::Value>(&metadata);
-    if metadata_json.is_err() {
-        return "Erro ao parsear metadata".to_string();
-    }
-    let mut metadata_json = metadata_json.unwrap();
-    metadata_json[campo] = valor;
-    fs::write(
-        format!("{}/metadata.json", &path),
-        metadata_json.to_string(),
-    )
-    .unwrap();
-    "Operação Executada Com Sucesso!".to_string()
-}
 #[tauri::command]
-fn get_number_of_projects(path: String) -> [i32; 8] {
-    let mut projects: [i32; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
+fn get_number_of_projects(path: String) -> [i32; 9] {
+    let mut projects: [i32; 9] = [0, 0, 0, 0, 0, 0, 0, 0, 0];
 
     let dir = fs::read_dir(path);
     if dir.is_err() {
@@ -388,6 +338,8 @@ fn get_number_of_projects(path: String) -> [i32; 8] {
                                             Some("05 - NEGOCIACAO") => projects[5] += 1,
                                             Some("06 - FINANCIAMENTO") => projects[6] += 1,
                                             Some("07 - FECHADO") => projects[7] += 1,
+                                            Some("08 - ARQUIVADO") => projects[8] += 1,
+
                                             _ => (),
                                         }
                                     }
@@ -401,7 +353,7 @@ fn get_number_of_projects(path: String) -> [i32; 8] {
     }
 
    
-    projects[0] = projects[1] + projects[2] + projects[3] + projects[4] + projects[5] + projects[6];
+    projects[0] = projects[1] + projects[2] + projects[3] + projects[4] + projects[5] + projects[6] + projects[7];
     projects
 }
 
@@ -457,6 +409,71 @@ fn set_dead_line(path: &str, dead_line: &str) -> String {
 
     "Operação Executada Com Sucesso!".to_string()
 }
+#[tauri::command]
+fn get_field_value(path: &str, customer: &str, project_name: &str, field: &str) -> Result<String, String> {
+    
+    let project_path_name = format!(
+        "{}-{}",
+        customer.to_string().to_uppercase().replace(" ", "_"),
+        project_name.to_string().to_uppercase().replace(" ", "_")
+    );
+    //procure um diretorio com o valor da variavel project_path_name em todos os subdiretorios de dir com excessão ao CLIENTES
+    for entry in WalkDir::new(path) {
+        if entry.is_ok() {
+            let entry = entry.unwrap();
+            if entry.file_type().is_dir() {
+                if entry.file_name() == project_path_name.as_str() {
+                    let metadata = fs::read_to_string(entry.path().join("metadata.json"));
+                    if metadata.is_ok() {
+                        let metadata_json = serde_json::from_str::<serde_json::Value>(metadata.unwrap().as_str());
+                        if metadata_json.is_ok() {
+                            let field = metadata_json.unwrap()[field].to_string();
+                            if field == "null" {
+                                return Ok("".to_string());
+                            }
+                            return Ok(field);
+                        }
+                    }
+                    return Err("Erro ao encontrar metadata".to_string());
+                }
+            }
+        }
+    }
+    return Err ("Erro ao encontrar projeto".to_string());
+
+}
+
+
+#[tauri::command]
+fn set_field_value(path: &str, customer: &str, project_name: &str, field: &str, value: serde_json::Value) -> Result<String, String> {
+    let project_path_name = format!(
+        "{}-{}",
+        customer.to_string().to_uppercase().replace(" ", "_"),
+        project_name.to_string().to_uppercase().replace(" ", "_")
+    );
+    //procure um diretorio com o valor da variavel project_path_name em todos os subdiretorios de dir com excessão ao CLIENTES
+    for entry in WalkDir::new(path) {
+        if entry.is_ok() {
+            let entry = entry.unwrap();
+            if entry.file_type().is_dir() {
+                if entry.file_name() == project_path_name.as_str() {
+                    let metadata = fs::read_to_string(entry.path().join("metadata.json"));
+                    if metadata.is_ok() {
+                        let metadata_json = serde_json::from_str::<serde_json::Value>(metadata.unwrap().as_str());
+                        if metadata_json.is_ok() {
+                            let mut metadata_json = metadata_json.unwrap();
+                            metadata_json[field] = value;
+                            fs::write(entry.path().join("metadata.json"), metadata_json.to_string()).unwrap();
+                            return Ok("Operação Executada Com Sucesso!".to_string());
+                        }
+                    }
+                    return Err("Erro ao encontrar metadata".to_string());
+                }
+            }
+        }
+    }
+    return Err ("Erro ao encontrar projeto".to_string());
+}
 
 fn main() {
     tauri::Builder::default()
@@ -470,10 +487,11 @@ fn main() {
             read_all_custommers,
             add_customer,
             insert_consultor,
-            edit_project,
             get_number_of_projects,
             get_dead_line,
-            set_dead_line
+            set_dead_line,
+            get_field_value, 
+            set_field_value
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -80,9 +80,12 @@ export default function ConfigForm({ setShowConfig, config, onSubmit }) {
                 financiamento: form.getFieldValue("DEADLINE_FINANCIAMENTO"),
             }
         }
+
+        
         invoke("set_dead_line", { path: folder, deadLine: JSON.stringify(config.DEAD_LINE) }).then((data) => {
             console.log(data);
         });
+        invoke("create_folders_sctructure", { path: folder }).then((data) => {console.log(data)});
         onSubmit();
 
 

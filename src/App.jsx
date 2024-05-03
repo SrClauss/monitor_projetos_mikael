@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import "./App.css";
 import { Button, Tooltip, Modal, Form, Input } from "antd";
-import { DoubleLeftOutlined, DoubleRightOutlined, FolderOpenFilled, CheckOutlined, DeleteColumnOutlined, DeleteOutlined } from "@ant-design/icons";
+import { DoubleLeftOutlined, DoubleRightOutlined, FolderOpenFilled, CheckOutlined, DeleteColumnOutlined, DeleteOutlined, FileTextFilled } from "@ant-design/icons";
 import { appLocalDataDir } from "@tauri-apps/api/path";
 import { fs } from "@tauri-apps/api";
 import SeachScreen from "./components/SeachScreen";
@@ -10,6 +10,7 @@ import { invoke } from "@tauri-apps/api";
 import ConfigForm from "./components/ConfigForm";
 import Consultor from "./components/Consultor";
 import LoginModal from "./components/LoginModal";
+import NotesModal from "./components/NotesModal";
 
 
 
@@ -26,7 +27,9 @@ function App() {
   const [customer, setCustomer] = useState("")
   const [configForm, setConfigForm] = useState(false)
   const [loginVisible, setLoginVisible] = useState(false)
-
+  const [recordNotes, setRecordNotes] = useState()
+  const [notesVisible, setNotesVisible] = useState(false)
+  
   
 
   const DeadLine = (record) => {
@@ -101,6 +104,7 @@ function App() {
 
 
   const moveForward = async (register) => {
+ 
     const folders = [
       "01 - PROJETO",
       "02 - DIGITACAO",
@@ -109,6 +113,7 @@ function App() {
       "05 - NEGOCIACAO",
       "06 - FINANCIAMENTO",
       "07 - FECHADO",
+      "08 - ARQUIVADO"
 
     ]
 
@@ -128,7 +133,7 @@ function App() {
           dest: nextFolder,
           date: new Date().toLocaleDateString()
         })
-        await readAllProjects()
+        await readAllProjects(config)
 
 
 
@@ -147,6 +152,7 @@ function App() {
       "05 - NEGOCIACAO",
       "06 - FINANCIAMENTO",
       "07 - FECHADO",
+      "08 - ARQUIVADO"
 
     ]
 
@@ -157,7 +163,7 @@ function App() {
 
 
     if (previousFolder) {
-      const ask = await confirm("Deseja mover o projeto para a pasta " + previousFolder + "?")
+      const ask =  confirm("Deseja mover o projeto para a pasta " + previousFolder + "?")
       if (ask) {
         invoke('move_path', {
           basepath: config.BASE_FOLDER,
@@ -167,7 +173,7 @@ function App() {
           date: new Date().toLocaleDateString()
         })
 
-        await readAllProjects()
+        await readAllProjects(config)
 
 
 
@@ -229,7 +235,6 @@ function App() {
     invoke("read_all_projects", { path: conf.BASE_FOLDER, fase: selectedFolder, customer: customer }).then((data) => {
 
       const jsonData = data.map(p => JSON.parse(p))
-      console.log(customer)
       setFilteredValues(() =>
         
         jsonData.map((project, index) => ({
@@ -319,8 +324,8 @@ function App() {
                   const copy = [...filteredValues]
                   copy[record.key].movimentado = e.target.checked
                   setFilteredValues(copy)
-                  //fn edit_project(path:String, fase:String,  cliente: String, descricao:String, campo:String, valor:String) 
-                  invoke("edit_project", { path: config.BASE_FOLDER, fase: record.fase, cliente: record.cliente, descricao: record.descricao, campo: "movimentado", valor: e.target.checked }).then((data) => {
+                  
+                  invoke("set_field_value", { path: config.BASE_FOLDER, customer: record.cliente, projectName: record.descricao, field: "movimentado", value: e.target.value}).then((data) => {
                     console.log(data)
                   }).catch((error) => {
                     console.log(error)
@@ -390,8 +395,9 @@ function App() {
           <Tooltip onClick={() => moveForward(record)} title="Avançar Projeto">
             <Button className="mr-1" icon={<DoubleRightOutlined />} />
           </Tooltip>
-
-
+          <Tooltip title="Inserir Anotação ao Projeto">
+            <Button className="mr-1" icon={<FileTextFilled />} onClick={(e)=>openNotesModal(record)} />
+          </Tooltip>
         </>
 
 
@@ -414,6 +420,10 @@ function App() {
 
     setLoginVisible(false)
   }
+  const openNotesModal = (record) => {
+    setRecordNotes(record)
+    setNotesVisible(true)
+  }
 
   return (
 
@@ -429,6 +439,9 @@ function App() {
           ) :
             <>
               <LoginModal visible={loginVisible} onLoginSubmit={handleLoginSubmit} onCancel={handleCancelLoginForm}/>
+
+              {notesVisible &&
+              <NotesModal record={recordNotes} visible={notesVisible} setVisible={setNotesVisible}/>}
               <SeachScreen
                 columns={columns}
                 filtredValues={filteredValues}
